@@ -17,9 +17,6 @@ import urlparse
 import random
 import string
 
-
-# Constants, configuration, and logger.
-
 CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
     'queue': os.path.join('~', '.dqlist'),
@@ -33,6 +30,9 @@ CURL_BASE = ["curl", "--location-trusted", "--fail"]
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
+
+class UserError(Exception):
+    """Raised when the program is misconfigured."""
 
 
 # Utilities.
@@ -88,6 +88,8 @@ def _config(key, path=CONFIG_FILE):
 
     if key in ('queue', 'dest'):
         value = os.path.abspath(os.path.expanduser(value))
+        if key == 'dest' and not os.path.isdir(value):
+            raise UserError('destination directory %s does not exist' % value)
     elif key in ('auth',) and not isinstance(value, dict):
         LOG.warn('%s must be a dictionary' % key)
         value = {}
@@ -141,7 +143,7 @@ def get_dest(url):
         filename = 'download-%s' % random_string()
         LOG.debug('using random: %s' % filename)
 
-    return filename
+    return os.path.join(_config('dest'), filename)
 
 def _authentication(url):
     """Returns additional cURL parameters for authenticating the given

@@ -22,6 +22,7 @@ CONFIG_DEFAULTS = {
     'queue': os.path.join('~', '.dqlist'),
     'dest': os.path.join('~', 'Downloads'),
     'auth': {},
+    'verbose': False,
 }
 CURL_RANGE_ERROR = 33
 CURL_BASE = ["curl", "--location-trusted"]
@@ -200,19 +201,25 @@ def do_run():
 
 def dq(command=None, *args):
     if not command:
-        print >>sys.stderr, 'available commands: add, list, run'
-        sys.exit(1)
+        LOG.error('available commands: add, list, run')
+        return 1
 
-    LOG.setLevel(logging.DEBUG)
+    if _config('verbose'):
+        LOG.setLevel(logging.DEBUG)
+    else:
+        LOG.setLevel(logging.INFO)
 
     if command.startswith('l'):
         do_list()
     elif command.startswith('a'):
         if not args:
-            print >>sys.stderr, 'specify URLs to add'
+            LOG.error('specify URLs to add')
+            return 1
         do_add(args)
     elif command.startswith('r'):
         do_run()
 
 if __name__ == '__main__':
-    dq(*sys.argv[1:])
+    code = dq(*sys.argv[1:])
+    if code:
+        sys.exit(code)

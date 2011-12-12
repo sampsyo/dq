@@ -28,7 +28,8 @@ CONFIG_DEFAULTS = {
     'verbose': False,
 }
 CURL_RANGE_ERROR = 33
-CURL_BASE = ["curl", "--location-trusted"]
+CURL_HTTP_ERROR = 22
+CURL_BASE = ["curl", "--location-trusted", "--fail"]
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
@@ -115,9 +116,11 @@ def get_dest(url):
     # "Content-Disposition" header containing a filename.
     args = CURL_BASE + ["-Is", url]
     args += _authentication(url)
+    LOG.debug("curl name-check command: %s" % ' '.join(args))
     try:
         out = subprocess.check_output(args)
     except subprocess.CalledProcessError:
+        LOG.debug("name-check command failed")
         pass
     else:
         match = re.search(r'content-disposition:.*filename\s*=\s*'
@@ -171,6 +174,7 @@ def fetch(url):
     args += [url]
 
     while True:
+        LOG.debug("curl fetch command: %s" % ' '.join(args))
         res = subprocess.call(args)
         LOG.debug('curl exit code: %i' % res)
         
@@ -181,6 +185,9 @@ def fetch(url):
             args.remove("-C")
             args.remove("-")
             continue
+        elif res == CURL_HTTP_ERROR:
+            LOG.error("download failed")
+            return False
 
         if res:
             return False

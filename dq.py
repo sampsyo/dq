@@ -16,6 +16,7 @@ CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
     'queue': os.path.join('~', '.dqlist'),
     'dest': os.path.join('~', 'Downloads'),
+    'auth': {},
 }
 
 CURL_RANGE_ERROR = 33
@@ -62,12 +63,15 @@ def _config(key, path=CONFIG_FILE):
         logging.warn('configuration is not a YAML dictionary')
         config = {}
 
-    value = config.get(key) or CONFIG_DEFAULTS.get(key)
-    if not value:
+    value = config.get(key, CONFIG_DEFAULTS.get(key))
+    if value is None or value == '':
         raise ValueError('no such config key: %s' % key)
 
     if key in ('queue', 'dest'):
         value = os.path.abspath(os.path.expanduser(value))
+    elif key in ('auth',) and not isinstance(value, dict):
+        logging.warn('%s must be a dictionary' % key)
+        value = {}
     return value
 
 def get_queue():
@@ -109,9 +113,36 @@ def get_dest(url):
 
     return filename
 
+def _authenticate(url):
+    """If the URL needs authentication according to the config file,
+    adds the username and password to the URL.
+    """
+    # Add authentication to the URL if necessary.
+    host = urlparse.urlparse(url).netloc
+    if '@' in host:
+        # Already authenticated.
+        return url
+    auth_hosts = _config('auth')
+    for auth_host, auth_parts in auth_hosts.iteritems():
+        if host in auth_host:
+            break
+    else:
+        # No matching authentication entry found.
+        return url
+
+    # Splice the details into the URL.
+    username, password = auth_parts.split(None, 1)
+    urlparts = list(urlparse.urlparse(url))
+    if '@' in host:
+        host = host.split('@', 1)[1]
+    host = '%s:%s@%s' % (username, password, host)
+    urlparts[1] = host
+    return urlparse.urlunparse(urlparts)
+
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""
-    print >>sys.stderr, "fetching %s" % url
+    logging.info("fetching %s" % url)
+    url = _authenticate(url)
     outfile = get_dest(url)
 
     args = ["curl", "-L", "-o", outfile]

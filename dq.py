@@ -7,6 +7,10 @@ import os
 import subprocess
 import yaml
 import logging
+import re
+import urlparse
+import random
+import string
 
 CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
@@ -15,6 +19,9 @@ CONFIG_DEFAULTS = {
 }
 
 CURL_RANGE_ERROR = 33
+
+def random_string(length=20, chars=(string.ascii_letters + string.digits)):
+    return ''.join(random.choice(chars) for i in range(length))
 
 class AtomicFile(file):
     def __init__(self, path, mode='r'):
@@ -76,7 +83,31 @@ def enqueue(urls):
             print >>f, url
 
 def get_dest(url):
-    return os.path.join(_config('dest'), 'out.txt')
+    """Get the destination filename for a URL."""
+    # First, try sending a HEAD request to look for a
+    # "Content-Disposition" header containing a filename.
+    filename = None
+    try:
+        out = subprocess.check_output(["curl", "-LI", url])
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        match = re.search(r'content-disposition:.*filename\s*=\s*'
+                          r'["\']?([^"\']+)["\']?', out, re.I)
+        if match:
+            filename = os.path.basename(match.group(1))
+
+    # Next, guess the filename from the URL.
+    if not filename:
+        parts = urlparse.urlparse(url).path.split('/')
+        if parts:
+            filename = parts[-1]
+
+    # Fall back on a nonsense filename.
+    if not filename:
+        filename = 'download-%s' % random_string()
+
+    return filename
 
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""

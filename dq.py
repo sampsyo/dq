@@ -1,5 +1,10 @@
 """A very simple, command-line-controlled, curl-powered, auto-resuming,
 auto-retrying download manager.
+
+The download queue is a simple text file. Every line in ~/.dqlist is a
+URL to be downloaded; the first URL in the list will be downloaded
+first. To add to the queue, you can just append to this file or use dq's
+"add" command.
 """
 import fcntl
 import sys
@@ -18,8 +23,10 @@ CONFIG_DEFAULTS = {
     'dest': os.path.join('~', 'Downloads'),
     'auth': {},
 }
-
 CURL_RANGE_ERROR = 33
+
+LOG = logging.getLogger('dq')
+LOG.addHandler(logging.StreamHandler())
 
 def random_string(length=20, chars=(string.ascii_letters + string.digits)):
     return ''.join(random.choice(chars) for i in range(length))
@@ -54,13 +61,13 @@ def _config(key, path=CONFIG_FILE):
         with open(path) as f:
             config = yaml.load(f)
     except IOError:
-        logging.debug('configuration file is unreadable')
+        LOG.debug('configuration file is unreadable')
         config = {}
     except yaml.YAMLError:
-        logging.warn('malformed configuration file')
+        LOG.warn('malformed configuration file')
         config = {}
     if not isinstance(config, dict):
-        logging.warn('configuration is not a YAML dictionary')
+        LOG.warn('configuration is not a YAML dictionary')
         config = {}
 
     value = config.get(key, CONFIG_DEFAULTS.get(key))
@@ -70,7 +77,7 @@ def _config(key, path=CONFIG_FILE):
     if key in ('queue', 'dest'):
         value = os.path.abspath(os.path.expanduser(value))
     elif key in ('auth',) and not isinstance(value, dict):
-        logging.warn('%s must be a dictionary' % key)
+        LOG.warn('%s must be a dictionary' % key)
         value = {}
     return value
 
@@ -141,7 +148,7 @@ def _authenticate(url):
 
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""
-    logging.info("fetching %s" % url)
+    LOG.info("fetching %s" % url)
     url = _authenticate(url)
     outfile = get_dest(url)
 
@@ -196,6 +203,8 @@ def dq(command=None, *args):
     if not command:
         print >>sys.stderr, 'available commands: add, list, run'
         sys.exit(1)
+
+    LOG.setLevel(logging.INFO)
 
     if command.startswith('l'):
         do_list()

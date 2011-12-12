@@ -24,6 +24,7 @@ CONFIG_DEFAULTS = {
     'auth': {},
 }
 CURL_RANGE_ERROR = 33
+CURL_BASE = ["curl", "--location-trusted"]
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
@@ -95,11 +96,14 @@ def enqueue(urls):
 
 def get_dest(url):
     """Get the destination filename for a URL."""
+    filename = None
+
     # First, try sending a HEAD request to look for a
     # "Content-Disposition" header containing a filename.
-    filename = None
+    args = CURL_BASE + ["-Is", url]
+    args += _authentication(url)
     try:
-        out = subprocess.check_output(["curl", "-LI", url])
+        out = subprocess.check_output(args)
     except subprocess.CalledProcessError:
         pass
     else:
@@ -107,52 +111,47 @@ def get_dest(url):
                           r'["\']?([^"\']+)["\']?', out, re.I)
         if match:
             filename = os.path.basename(match.group(1))
+            LOG.debug('got filename from headers: %s' % filename)
 
     # Next, guess the filename from the URL.
     if not filename:
         parts = urlparse.urlparse(url).path.split('/')
         if parts:
             filename = parts[-1]
+            LOG.debug('got filename from URL: %s' % filename)
 
     # Fall back on a nonsense filename.
     if not filename:
         filename = 'download-%s' % random_string()
+        LOG.debug('using random: %s' % filename)
 
     return filename
 
-def _authenticate(url):
-    """If the URL needs authentication according to the config file,
-    adds the username and password to the URL.
+def _authentication(url):
+    """Returns additional cURL parameters for authenticating the given
+    URL. Returns an empty list if no authentication is necessary.
     """
     # Add authentication to the URL if necessary.
     host = urlparse.urlparse(url).netloc
-    if '@' in host:
-        # Already authenticated.
-        return url
     auth_hosts = _config('auth')
     for auth_host, auth_parts in auth_hosts.iteritems():
         if host in auth_host:
             break
     else:
         # No matching authentication entry found.
-        return url
+        return []
 
     # Splice the details into the URL.
     username, password = auth_parts.split(None, 1)
-    urlparts = list(urlparse.urlparse(url))
-    if '@' in host:
-        host = host.split('@', 1)[1]
-    host = '%s:%s@%s' % (username, password, host)
-    urlparts[1] = host
-    return urlparse.urlunparse(urlparts)
+    return ['-u', '%s:%s' % (username, password)]
 
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""
     LOG.info("fetching %s" % url)
-    url = _authenticate(url)
     outfile = get_dest(url)
 
-    args = ["curl", "-L", "-o", outfile]
+    args = CURL_BASE + ["-o", outfile]
+    args += _authentication(url)
     if os.path.exists(outfile):
         # Try to resume.
         args += ["-C", "-"]
@@ -204,7 +203,7 @@ def dq(command=None, *args):
         print >>sys.stderr, 'available commands: add, list, run'
         sys.exit(1)
 
-    LOG.setLevel(logging.INFO)
+    LOG.setLevel(logging.DEBUG)
 
     if command.startswith('l'):
         do_list()

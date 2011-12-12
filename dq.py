@@ -17,6 +17,9 @@ import urlparse
 import random
 import string
 
+
+# Constants, configuration, and logger.
+
 CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
     'queue': os.path.join('~', '.dqlist'),
@@ -29,6 +32,9 @@ CURL_BASE = ["curl", "--location-trusted"]
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
+
+
+# Utilities.
 
 def random_string(length=20, chars=(string.ascii_letters + string.digits)):
     return ''.join(random.choice(chars) for i in range(length))
@@ -47,6 +53,9 @@ class AtomicFile(file):
         if not self.closed:
             fcntl.lockf(self, fcntl.LOCK_UN) # Unlock.
         super(AtomicFile, self).close()
+
+
+# Queue and configuration logic.
 
 def _read_queue(fh):
     """Generates the URLs in the queue."""
@@ -94,6 +103,9 @@ def enqueue(urls):
     with AtomicFile(_config('queue'), 'a') as f:
         for url in urls:
             print >>f, url
+
+
+# Fetch logic.
 
 def get_dest(url):
     """Get the destination filename for a URL."""
@@ -160,11 +172,12 @@ def fetch(url):
 
     while True:
         res = subprocess.call(args)
+        LOG.debug('curl exit code: %i' % res)
         
         if res == CURL_RANGE_ERROR:
             # Tried to resume, but the server does not support ranges
             # (resuming). Overwrite file.
-            print >>sys.stderr, "resume failed; starting over"
+            LOG.error("resume failed; starting over")
             args.remove("-C")
             args.remove("-")
             continue
@@ -174,16 +187,22 @@ def fetch(url):
         else:
             return True
 
+
+# Main command-line interface.
+
 def do_list():
+    """List command: show the queue."""
     for url in get_queue():
         print url
 
 def do_add(urls):
+    """Add command: enqueue a URL."""
     for url in urls:
         assert url.startswith('http://')
     enqueue(urls)
 
 def do_run():
+    """Run command: execute the download queue."""
     queue = get_queue()
     if not queue:
         return
@@ -200,6 +219,7 @@ def do_run():
                     print >>f, q_url
 
 def dq(command=None, *args):
+    """Main command-line interface."""
     if not command:
         LOG.error('available commands: add, list, run')
         return 1

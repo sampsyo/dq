@@ -5,9 +5,14 @@ import fcntl
 import sys
 import os
 import subprocess
+import yaml
+import logging
 
-QUEUE_FILE = os.path.expanduser(os.path.join('~', '.dqlist'))
-DEST_DIR = os.path.expanduser(os.path.join('~', 'Downloads'))
+CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
+CONFIG_DEFAULTS = {
+    'queue': os.path.join('~', '.dqlist'),
+    'dest': os.path.join('~', 'Downloads'),
+}
 
 CURL_RANGE_ERROR = 33
 
@@ -27,31 +32,58 @@ class AtomicFile(file):
         super(AtomicFile, self).close()
 
 def _read_queue(fh):
+    """Generates the URLs in the queue."""
     for line in fh:
         line = line.strip()
         if line:
             yield line
 
+def _config(key, path=CONFIG_FILE):
+    """Read the configuration dictionary, with default values filled
+    in.
+    """
+    try:
+        with open(path) as f:
+            config = yaml.load(f)
+    except IOError:
+        logging.debug('configuration file is unreadable')
+        config = {}
+    except yaml.YAMLError:
+        logging.warn('malformed configuration file')
+        config = {}
+    if not isinstance(config, dict):
+        logging.warn('configuration is not a YAML dictionary')
+        config = {}
+
+    value = config.get(key) or CONFIG_DEFAULTS.get(key)
+    if not value:
+        raise ValueError('no such config key: %s' % key)
+
+    if key in ('queue', 'dest'):
+        value = os.path.abspath(os.path.expanduser(value))
+    return value
+
 def get_queue():
-    if not os.path.exists(QUEUE_FILE):
+    qfile = _config('queue')
+    if not os.path.exists(qfile):
         return []
-    with AtomicFile(QUEUE_FILE) as f:
+    with AtomicFile(qfile) as f:
         return list(_read_queue(f))
 
 def enqueue(urls):
-    with AtomicFile(QUEUE_FILE, 'a') as f:
+    with AtomicFile(_config('queue'), 'a') as f:
         for url in urls:
             print >>f, url
 
 def get_dest(url):
-    return os.path.join(DEST_DIR, 'out.txt')
+    return os.path.join(_config('dest'), 'out.txt')
 
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""
     print >>sys.stderr, "fetching %s" % url
     outfile = get_dest(url)
 
-    args = ["curl", "-o", outfile]
+    args = ["curl", "-L", "-o", outfile]
     if os.path.exists(outfile):
         # Try to resume.
         args += ["-C", "-"]
@@ -90,7 +122,7 @@ def do_run():
 
     if fetch(url):
         # Remove the completed URL.
-        with AtomicFile(QUEUE_FILE, 'r+') as f:
+        with AtomicFile(_config('queue'), 'r+') as f:
             queue = list(_read_queue(f))
             f.seek(0)
             f.truncate()

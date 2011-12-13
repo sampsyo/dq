@@ -206,26 +206,23 @@ def do_list():
 
 def do_add(urls):
     """Add command: enqueue a URL."""
-    for url in urls:
-        assert url.startswith('http://')
+    if not urls:
+        raise UserError("no URLs specified")
     enqueue(urls)
 
 def do_run():
     """Run command: execute the download queue."""
     queue = get_queue()
-    if not queue:
-        return
-    url = queue[0]
-
-    if fetch(url):
-        # Remove the completed URL.
-        with AtomicFile(_config('queue'), 'r+') as f:
-            queue = list(_read_queue(f))
-            f.seek(0)
-            f.truncate()
-            for q_url in queue:
-                if q_url != url:
-                    print >>f, q_url
+    for url in queue:
+        if fetch(url):
+            # Remove the completed URL.
+            with AtomicFile(_config('queue'), 'r+') as f:
+                queue = list(_read_queue(f))
+                f.seek(0)
+                f.truncate()
+                for q_url in queue:
+                    if q_url != url:
+                        print >>f, q_url
 
 def dq(command=None, *args):
     """Main command-line interface."""
@@ -241,9 +238,6 @@ def dq(command=None, *args):
     if command.startswith('l'):
         do_list()
     elif command.startswith('a'):
-        if not args:
-            LOG.error('specify URLs to add')
-            return 1
         do_add(args)
     elif command.startswith('r'):
         do_run()

@@ -153,7 +153,7 @@ def _authentication(url):
     host = urlparse.urlparse(url).netloc
     auth_hosts = _config('auth')
     for auth_host, auth_parts in auth_hosts.iteritems():
-        if host in auth_host:
+        if auth_host in host:
             break
     else:
         # No matching authentication entry found.

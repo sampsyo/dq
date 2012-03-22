@@ -16,6 +16,7 @@ import re
 import urlparse
 import random
 import string
+import contextlib
 
 CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
@@ -107,6 +108,16 @@ def enqueue(urls):
         for url in urls:
             print >>f, url
 
+@contextlib.contextmanager
+def chdir(d):
+    """A context manager that changes the working directory and then
+    changes it back.
+    """
+    old_dir = os.getcwd()
+    os.chdir(d)
+    yield
+    os.chdir(old_dir)
+
 
 # Fetch logic.
 
@@ -166,18 +177,15 @@ def _authentication(url):
 def fetch(url):
     """Fetch a URL. Returns True on success and False on failure."""
     LOG.info("fetching %s" % url)
-    outfile = get_dest(url)
 
-    args = CURL_BASE + ["-o", outfile]
+    args = CURL_BASE + ["-O", "-J", "-C", "-"]
     args += _authentication(url)
-    if os.path.exists(outfile):
-        # Try to resume.
-        args += ["-C", "-"]
     args += [url]
 
     while True:
         LOG.debug("curl fetch command: %s" % ' '.join(args))
-        res = subprocess.call(args)
+        with chdir(_config('dest')):
+            res = subprocess.call(args)
         LOG.debug('curl exit code: %i' % res)
         
         if res == CURL_RANGE_ERROR:

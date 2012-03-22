@@ -43,6 +43,7 @@ available configuration keys are:
   and password (separated by whitespace) given in the value are used for
   authentication.
 * `verbose`: A boolean indicating whether debug output should be shown.
+* `curlargs`: Additional command-line arguments to be passed to curl.
 
 Here's an example configuration file:
 

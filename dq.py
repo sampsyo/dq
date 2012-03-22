@@ -17,6 +17,7 @@ import urlparse
 import random
 import string
 import contextlib
+import shlex
 
 CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
 CONFIG_DEFAULTS = {
@@ -24,6 +25,7 @@ CONFIG_DEFAULTS = {
     'dest': os.path.join('~', 'Downloads'),
     'auth': {},
     'verbose': False,
+    'curlargs': [],
 }
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
@@ -94,6 +96,8 @@ def _config(key, path=CONFIG_FILE):
     elif key in ('auth',) and not isinstance(value, dict):
         LOG.warn('%s must be a dictionary' % key)
         value = {}
+    elif key in ('curlargs',) and not isinstance(value, list):
+        value = shlex.split(value)
     return value
 
 def get_queue():
@@ -121,41 +125,6 @@ def chdir(d):
 
 # Fetch logic.
 
-def get_dest(url):
-    """Get the destination filename for a URL."""
-    filename = None
-
-    # First, try sending a HEAD request to look for a
-    # "Content-Disposition" header containing a filename.
-    args = CURL_BASE + ["-Is", url]
-    args += _authentication(url)
-    LOG.debug("curl name-check command: %s" % ' '.join(args))
-    try:
-        out = subprocess.check_output(args)
-    except subprocess.CalledProcessError:
-        LOG.debug("name-check command failed")
-        pass
-    else:
-        match = re.search(r'content-disposition:.*filename\s*=\s*'
-                          r'["\']?([^"\']+)["\']?', out, re.I)
-        if match:
-            filename = os.path.basename(match.group(1))
-            LOG.debug('got filename from headers: %s' % filename)
-
-    # Next, guess the filename from the URL.
-    if not filename:
-        parts = urlparse.urlparse(url).path.split('/')
-        if parts:
-            filename = parts[-1]
-            LOG.debug('got filename from URL: %s' % filename)
-
-    # Fall back on a nonsense filename.
-    if not filename:
-        filename = 'download-%s' % random_string()
-        LOG.debug('using random: %s' % filename)
-
-    return os.path.join(_config('dest'), filename)
-
 def _authentication(url):
     """Returns additional cURL parameters for authenticating the given
     URL. Returns an empty list if no authentication is necessary.
@@ -180,6 +149,7 @@ def fetch(url):
 
     args = CURL_BASE + ["-O", "-J", "-C", "-"]
     args += _authentication(url)
+    args += _config('curlargs')
     args += [url]
 
     while True:

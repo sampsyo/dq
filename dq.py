@@ -17,6 +17,7 @@ import random
 import string
 import contextlib
 import shlex
+import time
 
 BASE_DIR = os.path.expanduser(os.path.join('~', '.dq'))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.yaml')
@@ -26,6 +27,7 @@ CONFIG_DEFAULTS = {
     'auth': {},
     'verbose': False,
     'curlargs': [],
+    'poll': 5.0,
 }
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
@@ -173,6 +175,17 @@ def _next_url(cur_url, remove):
 
     return next_url
 
+def _wait_for_url():
+    """If the queue has any URLs in it, return the first URL. Otherwise,
+    poll the file until it becomes nonempty and then return the first
+    URL.
+    """
+    queue = get_queue()
+    while not queue:
+        time.sleep(_config('poll'))
+        queue = get_queue()
+    return queue[0]
+
 
 # Fetch logic.
 
@@ -241,9 +254,8 @@ def do_add(urls):
 
 def do_run():
     """Run command: execute the download queue."""
-    queue = get_queue()
-    if queue:
-        cur_url = queue[0]
+    while True:
+        cur_url = _wait_for_url()
         while cur_url is not None:
             success = fetch(cur_url)
             cur_url = _next_url(cur_url, success)

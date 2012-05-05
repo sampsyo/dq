@@ -27,10 +27,10 @@ command:
 
 To see your queue, type `dq list` (or `cat ~/.dq/queue.txt` if you prefer).
 Then, to start working through your queue, run the `dq run` command. This will
-download everything in your queue, starting withe the first entry in the file.
-The command exits once it has tried to download each file. URLs are only
-removed from the queue file once they are successfully and completely
-downloaded.
+download everything in your queue, starting with the first entry in the file.
+If there are no URLs in the queue currently, the process waits for a new URL to
+be added. URLs are only removed from the queue file once they are successfully
+and completely downloaded.
 
 Configuration
 -------------
@@ -46,6 +46,8 @@ The available configuration keys are:
   authentication.
 * `verbose`: A boolean indicating whether debug output should be shown.
 * `curlargs`: Additional command-line arguments to be passed to curl.
+* `poll`: The number of seconds between polls of the queue file when it is
+  empty.
 
 Here's an example configuration file:
 
@@ -60,12 +62,10 @@ To Do
 
 I'll do these things eventually:
 
-* Continually running daemon. Currently, you have to leave `dq run` running to
-  fetch your files and restart it after your queue finishes. There should be a
-  daemon that sits in waiting even if there are currently no files to download.
 * Multiple downloads?
 * Error log.
 * Bounded number of retries.
+* Use inotify instead of polling the queue file.
 
 About
 -----

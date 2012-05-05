@@ -161,7 +161,7 @@ def fetch(url):
         with chdir(_config('dest')):
             res = subprocess.call(args)
         LOG.debug('curl exit code: %i' % res)
-        
+
         if res == CURL_RANGE_ERROR:
             # Tried to resume, but the server does not support ranges
             # (resuming). Overwrite file.
@@ -224,7 +224,7 @@ def dq(command=None, *args):
     elif command.startswith('r'):
         do_run()
 
-if __name__ == '__main__':
+def main():
     code = dq(*sys.argv[1:])
     if code:
         sys.exit(code)

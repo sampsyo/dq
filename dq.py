@@ -180,9 +180,15 @@ def _wait_for_url():
     poll the file until it becomes nonempty and then return the first
     URL.
     """
+    poll_time = _config('poll')
+    queue_filename = _config('queue')
+
+    mtime = os.path.getmtime(queue_filename)
     queue = get_queue()
     while not queue:
-        time.sleep(_config('poll'))
+        while os.path.getmtime(queue_filename) == mtime:
+            time.sleep(poll_time)
+        mtime = os.path.getmtime(queue_filename)
         queue = get_queue()
     return queue[0]
 

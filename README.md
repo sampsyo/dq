@@ -30,7 +30,7 @@ Then, to start working through your queue, run the `dq run` command. This will
 download everything in your queue, starting with the first entry in the file.
 If there are no URLs in the queue currently, the process waits for a new URL to
 be added. URLs are only removed from the queue file once they are successfully
-and completely downloaded.
+and completely downloaded. Type `^C` to exit the downloader.
 
 Configuration
 -------------

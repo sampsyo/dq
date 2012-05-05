@@ -254,11 +254,14 @@ def do_add(urls):
 
 def do_run():
     """Run command: execute the download queue."""
-    while True:
-        cur_url = _wait_for_url()
-        while cur_url is not None:
-            success = fetch(cur_url)
-            cur_url = _next_url(cur_url, success)
+    try:
+        while True:
+            cur_url = _wait_for_url()
+            while cur_url is not None:
+                success = fetch(cur_url)
+                cur_url = _next_url(cur_url, success)
+    except KeyboardInterrupt:
+        pass
 
 def dq(command=None, *args):
     """Main command-line interface."""

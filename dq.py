@@ -126,6 +126,53 @@ def chdir(d):
     yield
     os.chdir(old_dir)
 
+def _next_url(cur_url, remove):
+    """Gets the next URL in the queue. If `remove`, then the current URL
+    is (atomically) removed from the queue (i.e., when the fetch
+    succeeds). If no next URL is available, None is returned.
+    """
+    with AtomicFile(_config('queue'), 'r+') as f:
+        queue = list(_read_queue(f))
+
+        # Get the next URL.
+        if cur_url in queue:
+            cur_index = queue.index(cur_url)
+
+            # Remove current URL.
+            if remove:
+                # Remove *all* instances of this URL (tolerate
+                # duplicates).
+                queue = [u for u in queue if u != cur_url]
+                if queue:
+                    if cur_index >= len(queue):
+                        cur_index = 0
+                    next_url = queue[cur_index]
+                else:
+                    next_url = None
+
+            # Failure: just skip to next URL.
+            else:
+                cur_index += 1
+                if cur_index >= len(queue):
+                    cur_index = 0
+                next_url = queue[cur_index]
+
+        # URL has since vanished from the queue.
+        else:
+            if queue:
+                next_url = queue[0]
+            else:
+                next_url = None
+
+        # Write back new queue (if necessary).
+        if remove:
+            f.seek(0)
+            f.truncate()
+            for q_url in queue:
+                print >>f, q_url
+
+    return next_url
+
 
 # Fetch logic.
 
@@ -195,16 +242,11 @@ def do_add(urls):
 def do_run():
     """Run command: execute the download queue."""
     queue = get_queue()
-    for url in queue:
-        if fetch(url):
-            # Remove the completed URL.
-            with AtomicFile(_config('queue'), 'r+') as f:
-                queue = list(_read_queue(f))
-                f.seek(0)
-                f.truncate()
-                for q_url in queue:
-                    if q_url != url:
-                        print >>f, q_url
+    if queue:
+        cur_url = queue[0]
+        while cur_url is not None:
+            success = fetch(cur_url)
+            cur_url = _next_url(cur_url, success)
 
 def dq(command=None, *args):
     """Main command-line interface."""

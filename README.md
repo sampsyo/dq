@@ -63,9 +63,9 @@ I'll do these things eventually:
 * Continually running daemon. Currently, you have to leave `dq run` running to
   fetch your files and restart it after your queue finishes. There should be a
   daemon that sits in waiting even if there are currently no files to download.
-* Automatically retry when a download is interrupted.
 * Multiple downloads?
 * Error log.
+* Bounded number of retries.
 
 About
 -----

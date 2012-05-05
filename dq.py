@@ -32,10 +32,12 @@ CONFIG_DEFAULTS = {
     'curlargs': [],
     'poll': 10.0,
     'retries': 5,
+    'post': None,
 }
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
 CURL_BASE = ["curl", "--location-trusted", "--fail"]
+COMMAND_PLACEHOLDER = '<URL>'
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
@@ -115,6 +117,14 @@ def _config(key, path=CONFIG_FILE):
     elif key in ('curlargs',) and not isinstance(value, list):
         value = shlex.split(value)
     return value
+
+def run_hook(url):
+    """Run the user's post-download command."""
+    command = _config('post')
+    if not command:
+        return
+    command = command.replace(COMMAND_PLACEHOLDER, url)
+    subprocess.call(command, shell=True)
 
 
 # State management.
@@ -357,6 +367,7 @@ def do_run():
             cur_url = _wait_for_url()
             while cur_url is not None:
                 success = fetch(cur_url)
+                run_hook(cur_url)
                 if success:
                     record_success(cur_url)
                     remove = True

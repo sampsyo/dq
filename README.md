@@ -11,6 +11,7 @@ Obligatory feature bullet points:
   (Convenient commands are also provided.)
 * Automatically resume transfers when possible.
 * Retry failed downloads up to *N* times.
+* Post-download hooks: run a shell command when a download finishes.
 * Configurable HTTP authentication: set a per-domain username and password so
   you don't have to enter your details every time.
 * Can run as a daemon, automatically checking for new URLs to fetch in the
@@ -58,11 +59,11 @@ The available configuration keys are:
   basic authentication. If a URL in the queue contains a given key, the username
   and password (separated by whitespace) given in the value are used for
   authentication.
+* `post`: A shell command to be executed when a download completes
+  successfully. The string `<URL>` is replaced with the URL in question.
 * `curlargs`: Additional command-line arguments to be passed to curl.
 * `retries`: The number of times to try downloading a given URL before giving
   up.
-* `failed`: The file where failed downloads are recorded. After a URL exceeds
-  its retry count, it is removed from the queue and placed here.
 
 These configuration keys are less likely to be useful but are available just in case:
 
@@ -71,6 +72,8 @@ These configuration keys are less likely to be useful but are available just in 
   empty.
 * `state`: The JSON file to store state in (e.g., the number of failed download
   attempts per URL).
+* `failed`: The file where failed downloads are recorded. After a URL exceeds
+  its retry count, it is removed from the queue and placed here.
 
 Here's an example configuration file:
 
@@ -79,6 +82,9 @@ Here's an example configuration file:
     auth:
         example.com: username password
     poll: 10.0
+    post: >
+        osascript -e 'tell app "System Events" to
+        display dialog "Finished download: <URL>"' &
 
 To Do
 -----

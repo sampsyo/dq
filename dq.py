@@ -18,12 +18,14 @@ import string
 import contextlib
 import shlex
 import time
+import json
 
 BASE_DIR = os.path.expanduser(os.path.join('~', '.dq'))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.yaml')
 CONFIG_DEFAULTS = {
     'queue': os.path.join(BASE_DIR, 'queue.txt'),
     'dest': os.path.join('~', 'Downloads'),
+    'state': os.path.join(BASE_DIR, 'state.json'),
     'auth': {},
     'verbose': False,
     'curlargs': [],
@@ -57,18 +59,28 @@ class AtomicFile(file):
 
     def close(self):
         if not self.closed:
-            fcntl.lockf(self, fcntl.LOCK_UN) # Unlock.
+            fcntl.lockf(self, fcntl.LOCK_UN)  # Unlock.
         super(AtomicFile, self).close()
 
+def ensure_parent(path):
+    """Ensure that the parent directory of the given path exists.
+    """
+    parent = os.path.dirname(path)
+    if parent and not os.path.exists(parent):
+        os.makedirs(parent)
 
-# Queue and configuration logic.
+@contextlib.contextmanager
+def chdir(d):
+    """A context manager that changes the working directory and then
+    changes it back.
+    """
+    old_dir = os.getcwd()
+    os.chdir(d)
+    yield
+    os.chdir(old_dir)
 
-def _read_queue(fh):
-    """Generates the URLs in the queue."""
-    for line in fh:
-        line = line.strip()
-        if line:
-            yield line
+
+# Reading the configuration file.
 
 def _config(key, path=CONFIG_FILE):
     """Read the configuration dictionary, with default values filled
@@ -91,7 +103,7 @@ def _config(key, path=CONFIG_FILE):
     if value is None or value == '':
         raise ValueError('no such config key: %s' % key)
 
-    if key in ('queue', 'dest'):
+    if key in ('queue', 'dest', 'state'):
         value = os.path.abspath(os.path.expanduser(value))
         if key == 'dest' and not os.path.isdir(value):
             raise UserError('destination directory %s does not exist' % value)
@@ -102,6 +114,74 @@ def _config(key, path=CONFIG_FILE):
         value = shlex.split(value)
     return value
 
+
+# State management.
+
+class State(object):
+    """A context manager providing atomic access to the JSON data stored
+    in a state file. The resulting value is a dictionary reflecting the
+    state data. While the context is active, the data may be modified;
+    the changed data is written back to the state file on exit.
+    """
+    def __init__(self, path=None):
+        self.path = path or _config('state')
+
+    def __enter__(self):
+        ensure_parent(self.path)
+        if os.path.exists(self.path):
+            self.af = AtomicFile(self.path, 'r+')
+            try:
+                self.data = json.load(self.af)
+            except ValueError:
+                LOG.debug('state file could not be parsed')
+                self.data = {}
+            except IOError:
+                LOG.debug('state file is unreadable')
+                self.data = {}
+            else:
+                if not isinstance(self.data, dict):
+                    LOG.debug('state file is not a dictionary')
+                    self.data = {}
+        else:
+            self.af = AtomicFile(self.path, 'w')
+            self.data = {}
+        return self.data
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.af.seek(0)
+        self.af.truncate()
+        json.dump(self.data, self.af)
+        self.af.close()
+
+def record_failure(url):
+    """Increment the number of failed tries for a URL."""
+    with State() as s:
+        if 'tries' in s:
+            if url in s['tries']:
+                s['tries'][url] += 1
+            else:
+                s['tries'][url] = 1
+        else:
+            s['tries'] = {url: 1}
+
+def record_success(url):
+    """Eliminate the try counter for a URL, indicating that is has been
+    successfully transferred.
+    """
+    with State() as s:
+        if 'tries' in s and url in s['tries']:
+            del s['tries'][url]
+
+
+# Queue logic.
+
+def _read_queue(fh):
+    """Generates the URLs in the queue."""
+    for line in fh:
+        line = line.strip()
+        if line:
+            yield line
+
 def get_queue():
     qfile = _config('queue')
     if not os.path.exists(qfile):
@@ -111,22 +191,10 @@ def get_queue():
 
 def enqueue(urls):
     queue_fn = _config('queue')
-    queue_parent = os.path.dirname(queue_fn)
-    if not os.path.exists(queue_parent):
-        os.makedirs(queue_parent)
+    ensure_parent(queue_fn)
     with AtomicFile(queue_fn, 'a') as f:
         for url in urls:
             print >>f, url
-
-@contextlib.contextmanager
-def chdir(d):
-    """A context manager that changes the working directory and then
-    changes it back.
-    """
-    old_dir = os.getcwd()
-    os.chdir(d)
-    yield
-    os.chdir(old_dir)
 
 def _next_url(cur_url, remove):
     """Gets the next URL in the queue. If `remove`, then the current URL
@@ -265,6 +333,10 @@ def do_run():
             cur_url = _wait_for_url()
             while cur_url is not None:
                 success = fetch(cur_url)
+                if success:
+                    record_success(cur_url)
+                else:
+                    record_failure(cur_url)
                 cur_url = _next_url(cur_url, success)
     except KeyboardInterrupt:
         pass

@@ -12,6 +12,8 @@ Obligatory feature bullet points:
 * Automatically resume transfers when possible.
 * Configurable HTTP authentication: set a per-domain username and password so
   you don't have to enter your details every time.
+* Can run as a daemon, automatically checking for new URLs to fetch in the
+  background.
 * Configurable destination directory.
 * Supports all the protocols that [cURL][] supports.
 

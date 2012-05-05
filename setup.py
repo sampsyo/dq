@@ -10,6 +10,8 @@ setup(name='dq',
       platforms='ALL',
       # long_description=_read('README.rst'),
 
+      install_requires=['pyyaml'],
+
       py_modules=['dq'],
 
       entry_points={

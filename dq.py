@@ -26,10 +26,12 @@ CONFIG_DEFAULTS = {
     'queue': os.path.join(BASE_DIR, 'queue.txt'),
     'dest': os.path.join('~', 'Downloads'),
     'state': os.path.join(BASE_DIR, 'state.json'),
+    'failed': os.path.join(BASE_DIR, 'failed.txt'),
     'auth': {},
     'verbose': False,
     'curlargs': [],
-    'poll': 5.0,
+    'poll': 10.0,
+    'retries': 5,
 }
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
@@ -103,7 +105,7 @@ def _config(key, path=CONFIG_FILE):
     if value is None or value == '':
         raise ValueError('no such config key: %s' % key)
 
-    if key in ('queue', 'dest', 'state'):
+    if key in ('queue', 'dest', 'state', 'failed'):
         value = os.path.abspath(os.path.expanduser(value))
         if key == 'dest' and not os.path.isdir(value):
             raise UserError('destination directory %s does not exist' % value)
@@ -154,7 +156,13 @@ class State(object):
         self.af.close()
 
 def record_failure(url):
-    """Increment the number of failed tries for a URL."""
+    """Increment the number of failed tries for a URL. Returns a boolean
+    indicating whether the URL has failed *permanently*, indicating that
+    it should be removed from the queue.
+    """
+    max_retries = _config('retries')
+
+    # Increment the try count.
     with State() as s:
         if 'tries' in s:
             if url in s['tries']:
@@ -163,6 +171,22 @@ def record_failure(url):
                 s['tries'][url] = 1
         else:
             s['tries'] = {url: 1}
+
+        # Check whether we've reached the maximum.
+        if s['tries'][url] >= max_retries:
+            del s['tries'][url]
+            LOG.warn('retried {} times, giving up'.format(max_retries))
+
+            # Record URL in list of permanent failures.
+            failed_fn = _config('failed')
+            ensure_parent(failed_fn)
+            with open(failed_fn, 'a') as f:
+                print >>f, url
+
+            return True
+
+        else:
+            return False
 
 def record_success(url):
     """Eliminate the try counter for a URL, indicating that is has been
@@ -335,9 +359,10 @@ def do_run():
                 success = fetch(cur_url)
                 if success:
                     record_success(cur_url)
+                    remove = True
                 else:
-                    record_failure(cur_url)
-                cur_url = _next_url(cur_url, success)
+                    remove = record_failure(cur_url)
+                cur_url = _next_url(cur_url, remove)
     except KeyboardInterrupt:
         pass
 

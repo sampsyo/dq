@@ -10,6 +10,7 @@ Obligatory feature bullet points:
   you can just append to the text file; to see the queue, all you need is `cat`.
   (Convenient commands are also provided.)
 * Automatically resume transfers when possible.
+* Retry failed downloads up to *N* times.
 * Configurable HTTP authentication: set a per-domain username and password so
   you don't have to enter your details every time.
 * Can run as a daemon, automatically checking for new URLs to fetch in the
@@ -31,8 +32,19 @@ To see your queue, type `dq list` (or `cat ~/.dq/queue.txt` if you prefer).
 Then, to start working through your queue, run the `dq run` command. This will
 download everything in your queue, starting with the first entry in the file.
 If there are no URLs in the queue currently, the process waits for a new URL to
-be added. URLs are only removed from the queue file once they are successfully
-and completely downloaded. Type `^C` to exit the downloader.
+be added.
+
+URLs are only removed from the queue file once they are successfully and
+completely downloaded. The downloader will retry failed downloads up to five
+times (this limit is configurable). If a URL fails to download after five
+tries, it is removed from the queue and placed in `~/.dq/failed.txt`.
+
+While the downloader is running, you can continue to add URLs to the queue
+file. The downloader process will pick them up automatically and start
+downloading them. To avoid messy concurrent filesystem access, use `dq add`
+instead of modifying the `queue.txt` file directly.
+
+Type `^C` to exit the downloader.
 
 Configuration
 -------------
@@ -46,10 +58,19 @@ The available configuration keys are:
   basic authentication. If a URL in the queue contains a given key, the username
   and password (separated by whitespace) given in the value are used for
   authentication.
-* `verbose`: A boolean indicating whether debug output should be shown.
 * `curlargs`: Additional command-line arguments to be passed to curl.
+* `retries`: The number of times to try downloading a given URL before giving
+  up.
+* `failed`: The file where failed downloads are recorded. After a URL exceeds
+  its retry count, it is removed from the queue and placed here.
+
+These configuration keys are less likely to be useful but are available just in case:
+
+* `verbose`: A boolean indicating whether debug output should be shown.
 * `poll`: The number of seconds between polls of the queue file when it is
   empty.
+* `state`: The JSON file to store state in (e.g., the number of failed download
+  attempts per URL).
 
 Here's an example configuration file:
 
@@ -57,16 +78,15 @@ Here's an example configuration file:
     queue: ~/downloadqueue.txt
     auth:
         example.com: username password
-    verbose: true 
+    poll: 10.0
 
 To Do
 -----
 
 I'll do these things eventually:
 
-* Multiple downloads?
+* Multiple concurrent downloads?
 * Error log.
-* Bounded number of retries.
 * Use inotify instead of polling the queue file.
 
 About

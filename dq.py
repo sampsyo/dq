@@ -12,16 +12,16 @@ import os
 import subprocess
 import yaml
 import logging
-import re
 import urlparse
 import random
 import string
 import contextlib
 import shlex
 
-CONFIG_FILE = os.path.expanduser(os.path.join('~', '.dqconfig'))
+BASE_DIR = os.path.expanduser(os.path.join('~', '.dq'))
+CONFIG_FILE = os.path.join(BASE_DIR, 'config.yaml')
 CONFIG_DEFAULTS = {
-    'queue': os.path.join('~', '.dqlist'),
+    'queue': os.path.join(BASE_DIR, 'queue.txt'),
     'dest': os.path.join('~', 'Downloads'),
     'auth': {},
     'verbose': False,
@@ -108,7 +108,11 @@ def get_queue():
         return list(_read_queue(f))
 
 def enqueue(urls):
-    with AtomicFile(_config('queue'), 'a') as f:
+    queue_fn = _config('queue')
+    queue_parent = os.path.dirname(queue_fn)
+    if not os.path.exists(queue_parent):
+        os.makedirs(queue_parent)
+    with AtomicFile(queue_fn, 'a') as f:
         for url in urls:
             print >>f, url
 

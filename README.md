@@ -18,23 +18,25 @@ Obligatory feature bullet points:
 Basic Usage
 -----------
 
-The URL queue is stored at `~/.dqlist` and files are downloaded to
+The URL queue is stored at `~/.dq/queue.txt` and files are downloaded to
 `~/Downloads` by default. (Both of these are configurable; see below.) To add a
-URL to your queue, just append to `~/.dqlist` or use the `dq add` command:
+URL to your queue, just append to `~/.dq/queue.txt` or use the `dq add`
+command:
 
     $ dq add http://example.com/file http://example.com/file2 [...]
 
-To see your queue, type `dq list` (or `cat ~/.dqlist` if you prefer). Then, to
-start working through your queue, run the `dq run` command. This will download
-everything in your queue, starting withe the first entry in the file. The
-command exits once it has tried to download each file. URLs are only removed
-from the queue file once they are successfully and completely downloaded.
+To see your queue, type `dq list` (or `cat ~/.dq/queue.txt` if you prefer).
+Then, to start working through your queue, run the `dq run` command. This will
+download everything in your queue, starting withe the first entry in the file.
+The command exits once it has tried to download each file. URLs are only
+removed from the queue file once they are successfully and completely
+downloaded.
 
 Configuration
 -------------
 
-The configuration file is at `~/.dqconfig`. It is a [YAML][] document. The
-available configuration keys are:
+The configuration file is at `~/.dq/config.yaml`. It is a [YAML][] document.
+The available configuration keys are:
 
 * `dest`: The download destination directory.
 * `queue`: The URL queue text file path.

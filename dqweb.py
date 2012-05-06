@@ -1,4 +1,5 @@
 import flask
+import os
 import dq
 app = flask.Flask(__name__)
 
@@ -29,8 +30,32 @@ TEMPLATE = """
     <input type="submit" value="Add URL">
 </form>
 
+<h2>Completed</h2>
+<ul>
+    {% for url in completed %}
+    <li><code>{{ url }}</code></li>
+    {% endfor %}
+</ul>
+
+<h2>Failed</h2>
+<ul>
+    {% for url in failed %}
+    <li><code>{{ url }}</code></li>
+    {% endfor %}
+</ul>
+
 </body>
 """
+
+def _lines(filename):
+    """Get a list of lines from a file if it exists. If the file does
+    not exist, return [].
+    """
+    if os.path.exists(filename):
+        with open(filename) as f:
+            return f.readlines()
+    else:
+        return []
 
 @app.route("/", methods=['GET', 'POST'])
 def home():
@@ -41,6 +66,8 @@ def home():
     return flask.render_template_string(TEMPLATE,
         urls=dq.get_queue(),
         current=dq.get_current(),
+        failed=_lines(dq._config('failed')),
+        completed=_lines(dq._config('completed')),
     )
 
 if __name__ == "__main__":

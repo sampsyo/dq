@@ -411,10 +411,15 @@ def do_run():
     except KeyboardInterrupt:
         pass
 
+def do_web():
+    """Web command: start Flask Web interface."""
+    import dqweb
+    dqweb.app.run(host='0.0.0.0')
+
 def dq(command=None, *args):
     """Main command-line interface."""
     if not command:
-        LOG.error('available commands: add, list, run')
+        LOG.error('available commands: add, list, run, web')
         return 1
 
     if _config('verbose'):
@@ -428,6 +433,8 @@ def dq(command=None, *args):
         do_add(args)
     elif command.startswith('r'):
         do_run()
+    elif command.startswith('w'):
+        do_web()
 
 def main():
     code = dq(*sys.argv[1:])

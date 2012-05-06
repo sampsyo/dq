@@ -96,8 +96,8 @@ Web Interface
 
 There's an extremely simple Web interface to the download queue in `dqweb.py`.
 It's a [Flask][flask] app that just displays the current queue and provides a
-form field for enqueueing new URLs. Just run `python dqweb.py` after installing
-Flask and visit `http://127.0.0.1:5000` in your browser.
+form field for enqueueing new URLs. Just run `dq web` after installing Flask
+and visit `http://127.0.0.1:5000` in your browser.
 
 [flask]: http://flask.pocoo.org/
 

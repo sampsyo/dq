@@ -25,7 +25,7 @@ TEMPLATE = """
 </ul>
 
 <h2>Add a URL</h2>
-<form method="POST" target="">
+<form method="POST" action="/add">
     <input type="text" name="url" style="width: 25em;">
     <input type="submit" value="Add URL">
 </form>
@@ -57,18 +57,20 @@ def _lines(filename):
     else:
         return []
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/")
 def home():
-    if flask.request.method == 'POST':
-        url = flask.request.form['url']
-        dq.enqueue([url])
-
     return flask.render_template_string(TEMPLATE,
         urls=dq.get_queue(),
         current=dq.get_current(),
         failed=_lines(dq._config('failed')),
         completed=_lines(dq._config('completed')),
     )
+
+@app.route("/add", methods=['POST'])
+def add_url():
+    url = flask.request.form['url']
+    dq.enqueue([url])
+    return flask.redirect(flask.url_for('home'))
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')

@@ -12,7 +12,7 @@ setup(name='dq',
 
       install_requires=['pyyaml'],
 
-      py_modules=['dq'],
+      py_modules=['dq', 'dqweb'],
 
       entry_points={
           'console_scripts': [

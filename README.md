@@ -41,6 +41,8 @@ URLs are only removed from the queue file once they are successfully and
 completely downloaded. The downloader will retry failed downloads up to five
 times (this limit is configurable). If a URL fails to download after five
 tries, it is removed from the queue and placed in `~/.dq/failed.txt`.
+Similarly, if a file successfully downloads, its URL is placed in
+`~/.dq/completed.txt`.
 
 While the downloader is running, you can continue to add URLs to the queue
 file. The downloader process will pick them up automatically and start
@@ -76,6 +78,7 @@ These configuration keys are less likely to be useful but are available just in 
   attempts per URL).
 * `failed`: The file where failed downloads are recorded. After a URL exceeds
   its retry count, it is removed from the queue and placed here.
+* `completed`: The file where successfully completed downloads are recorded.
 
 Here's an example configuration file:
 

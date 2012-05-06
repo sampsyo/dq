@@ -27,6 +27,7 @@ CONFIG_DEFAULTS = {
     'dest': os.path.join('~', 'Downloads'),
     'state': os.path.join(BASE_DIR, 'state.json'),
     'failed': os.path.join(BASE_DIR, 'failed.txt'),
+    'completed': os.path.join(BASE_DIR, 'completed.txt'),
     'auth': {},
     'verbose': False,
     'curlargs': [],
@@ -83,6 +84,14 @@ def chdir(d):
     yield
     os.chdir(old_dir)
 
+def add_line(filename, line):
+    """Add a single line of text to a text file. Ensures that the file's
+    parent directory exists before trying to write.
+    """
+    ensure_parent(filename)
+    with open(filename, 'a') as f:
+        print >>f, line
+
 
 # Reading the configuration file.
 
@@ -107,7 +116,7 @@ def _config(key, path=CONFIG_FILE):
     if value is None or value == '':
         raise ValueError('no such config key: %s' % key)
 
-    if key in ('queue', 'dest', 'state', 'failed'):
+    if key in ('queue', 'dest', 'state', 'failed', 'completed'):
         value = os.path.abspath(os.path.expanduser(value))
         if key == 'dest' and not os.path.isdir(value):
             raise UserError('destination directory %s does not exist' % value)
@@ -186,13 +195,7 @@ def record_failure(url):
         if s['tries'][url] >= max_retries:
             del s['tries'][url]
             LOG.warn('retried {} times, giving up'.format(max_retries))
-
-            # Record URL in list of permanent failures.
-            failed_fn = _config('failed')
-            ensure_parent(failed_fn)
-            with open(failed_fn, 'a') as f:
-                print >>f, url
-
+            add_line(_config('failed'), url)
             return True
 
         else:
@@ -205,6 +208,8 @@ def record_success(url):
     with State() as s:
         if 'tries' in s and url in s['tries']:
             del s['tries'][url]
+
+    add_line(_config('completed'), url)
 
 def set_current(url):
     """Record the currently-downloading URL in the state file. If URL is

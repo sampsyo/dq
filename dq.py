@@ -206,6 +206,31 @@ def record_success(url):
         if 'tries' in s and url in s['tries']:
             del s['tries'][url]
 
+def set_current(url):
+    """Record the currently-downloading URL in the state file. If URL is
+    None, the current URL is cleared.
+    """
+    with State() as s:
+        if url is None:
+            if 'current' in s:
+                del s['current']
+        else:
+            s['current'] = {'url': url}
+
+def get_current():
+    """Determine the currently-downloading URL. Return None if none is
+    recorded. The URL must be in the queue; if it is not, then it is cleared
+    and None is returned.
+    """
+    queue = get_queue()
+    with State() as s:
+        if 'current' in s:
+            url = s['current']['url']
+            if url in queue:
+                return url
+            else:
+                del s['current']
+
 
 # Queue logic.
 
@@ -362,10 +387,13 @@ def do_add(urls):
 
 def do_run():
     """Run command: execute the download queue."""
+    cur_url = get_current()
     try:
         while True:
-            cur_url = _wait_for_url()
+            if not cur_url:
+                cur_url = _wait_for_url()
             while cur_url is not None:
+                set_current(cur_url)
                 success = fetch(cur_url)
                 run_hook(cur_url)
                 if success:
@@ -374,6 +402,7 @@ def do_run():
                 else:
                     remove = record_failure(cur_url)
                 cur_url = _next_url(cur_url, remove)
+            set_current(None)
     except KeyboardInterrupt:
         pass
 

@@ -33,8 +33,9 @@ command:
 To see your queue, type `dq list` (or `cat ~/.dq/queue.txt` if you prefer).
 Then, to start working through your queue, run the `dq run` command. This will
 download everything in your queue, starting with the first entry in the file.
-If there are no URLs in the queue currently, the process waits for a new URL to
-be added.
+(Or, if you interrupted a previous invocation of `dq run`, it will resume the
+most recent download.) If there are no URLs in the queue currently, the process
+waits for a new URL to be added.
 
 URLs are only removed from the queue file once they are successfully and
 completely downloaded. The downloader will retry failed downloads up to five

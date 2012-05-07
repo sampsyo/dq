@@ -25,7 +25,7 @@ TEMPLATE = """
 </ul>
 
 <h2>Add a URL</h2>
-<form method="POST" action="/add">
+<form method="POST" action="{{ url_for('add_url') }}">
     <input type="text" name="url" style="width: 25em;">
     <input type="submit" value="Add URL">
 </form>

@@ -113,7 +113,7 @@ def _config(key, path=CONFIG_FILE):
         config = {}
 
     value = config.get(key, CONFIG_DEFAULTS.get(key))
-    if value is None or value == '':
+    if (value is None or value == '') and key != 'post':
         raise ValueError('no such config key: %s' % key)
 
     if key in ('queue', 'dest', 'state', 'failed', 'completed'):

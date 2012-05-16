@@ -101,6 +101,27 @@ def hashstr(s):
     """
     return base64.b64encode(hashlib.sha256(s).digest(), 'xx')[:-1]
 
+def unique_path(path):
+    """Returns a version of ``path`` that does not exist on the
+    filesystem. Specifically, if ``path` itself already exists, then
+    something unique is appended to the path.
+    """
+    if not os.path.exists(path):
+        return path
+
+    base, ext = os.path.splitext(path)
+    match = re.search(r'\.(\d)+$', base)
+    if match:
+        num = int(match.group(1))
+        base = base[:match.start()]
+    else:
+        num = 0
+    while True:
+        num += 1
+        new_path = '%s.%i%s' % (base, num, ext)
+        if not os.path.exists(new_path):
+            return new_path
+
 def _filename(url, headers):
     """Given the URL and the HTTP headers received while fetching it,
     generate a reasonable name for the file. If no suitable name can be
@@ -432,6 +453,7 @@ def fetch(url):
     dest_file = _filename(url, headers)
     if dest_file:
         dest_file = os.path.join(_config('dest'), dest_file)
+        dest_file = unique_path(dest_file)
         os.rename(outfile, dest_file)
         return dest_file
     else:

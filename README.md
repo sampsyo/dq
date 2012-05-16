@@ -64,7 +64,8 @@ The available configuration keys are:
   and password (separated by whitespace) given in the value are used for
   authentication.
 * `post`: A shell command to be executed when a download completes
-  successfully. The string `<URL>` is replaced with the URL in question.
+  successfully. The string `<URL>` is replaced with the URL in question;
+  `<PATH>` is replaced with the (local) path to the downloaded file.
 * `curlargs`: Additional command-line arguments to be passed to curl.
 * `retries`: The number of times to try downloading a given URL before giving
   up.

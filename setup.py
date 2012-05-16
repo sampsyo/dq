@@ -10,7 +10,7 @@ setup(name='dq',
       platforms='ALL',
       # long_description=_read('README.rst'),
 
-      install_requires=['pyyaml'],
+      install_requires=['pyyaml', 'rfc6266'],
 
       py_modules=['dq', 'dqweb'],
 

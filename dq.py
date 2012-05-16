@@ -15,10 +15,14 @@ import logging
 import urlparse
 import random
 import string
-import contextlib
 import shlex
 import time
 import json
+import hashlib
+import base64
+import tempfile
+import rfc6266
+import re
 
 BASE_DIR = os.path.expanduser(os.path.join('~', '.dq'))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.yaml')
@@ -38,7 +42,16 @@ CONFIG_DEFAULTS = {
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
 CURL_BASE = ["curl", "--location-trusted", "--fail"]
-COMMAND_PLACEHOLDER = '<URL>'
+CMD_PLACEHOLDER_URL = '<URL>'
+CMD_PLACEHOLDER_PATH = '<PATH>'
+PART_EXT = 'part'
+FILENAME_REPLACE = [
+    re.compile(r'[\\/]'),
+    re.compile(r'^\.'),
+    re.compile(r'[\x00-\x1f]'),
+    re.compile(r'[<>:"\?\*\|]'),
+    re.compile(r'\.$'),
+]
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
@@ -74,16 +87,6 @@ def ensure_parent(path):
     if parent and not os.path.exists(parent):
         os.makedirs(parent)
 
-@contextlib.contextmanager
-def chdir(d):
-    """A context manager that changes the working directory and then
-    changes it back.
-    """
-    old_dir = os.getcwd()
-    os.chdir(d)
-    yield
-    os.chdir(old_dir)
-
 def add_line(filename, line):
     """Add a single line of text to a text file. Ensures that the file's
     parent directory exists before trying to write.
@@ -91,6 +94,45 @@ def add_line(filename, line):
     ensure_parent(filename)
     with open(filename, 'a') as f:
         print >>f, line
+
+def hashstr(s):
+    """Return the (cryptographic) hash of the input string as another
+    string. The string is safe to include in a filename. The hash is
+    mangled slightly so it's probably best not to use it for actual
+    security.
+    """
+    return base64.b64encode(hashlib.sha256(s).digest(), 'xx')[:-1]
+
+def _filename(url, headers):
+    """Given the URL and the HTTP headers received while fetching it,
+    generate a reasonable name for the file. If no suitable name can be
+    found, return None. (Either uses the Content-Disposition explicit
+    filename or a filename from the URL.)
+    """
+    filename = None
+
+    # Try to get filename from Content-Disposition header.
+    heads = re.findall(r'^Content-Disposition:\s*(.*?)\r\n',
+                       headers, re.I | re.M)
+    if heads:
+        filename = rfc6266.parse_headers(heads[-1]).filename_unsafe
+
+    # Get filename from URL.
+    if not filename:
+        parts = urlparse.urlparse(url).path.split('/')
+        if parts:
+            filename = parts[-1]
+
+    # Strip unsafe characters from path.
+    if filename:
+        filename = filename.strip()
+        for sep in (os.sep, os.altsep):
+            if sep:
+                filename = filename.replace(sep, '_')
+        for pat in FILENAME_REPLACE:
+            filename = pat.sub('_', filename)
+        if filename:
+            return filename
 
 
 # Reading the configuration file.
@@ -127,12 +169,13 @@ def _config(key, path=CONFIG_FILE):
         value = shlex.split(value)
     return value
 
-def run_hook(url):
+def run_hook(url, path):
     """Run the user's post-download command."""
     command = _config('post')
     if not command:
         return
-    command = command.replace(COMMAND_PLACEHOLDER, url)
+    command = command.replace(CMD_PLACEHOLDER_URL, url)
+    command = command.replace(CMD_PLACEHOLDER_PATH, path)
     subprocess.call(command, shell=True)
 
 
@@ -346,35 +389,56 @@ def _authentication(url):
     return ['-u', '%s:%s' % (username, password)]
 
 def fetch(url):
-    """Fetch a URL. Returns True on success and False on failure."""
+    """Fetch a URL. On success, return the path to the downloaded file.
+    On failure, return None.
+    """
     LOG.info("fetching %s" % url)
 
-    args = CURL_BASE + ["-O", "-J", "-C", "-"]
+    urlhash = hashstr(url)
+    outfile = os.path.join(_config('dest'),
+                           '{}.{}'.format(urlhash, PART_EXT))
+    headerfile = os.path.join(tempfile.gettempdir(),
+                              'dq_headers_{}'.format(urlhash))
+
+    args = CURL_BASE + ["--output", outfile,
+                        "--dump-header", headerfile]
+    if os.path.exists(outfile):
+        args += ["--continue-at", "-"]
     args += _authentication(url)
     args += _config('curlargs')
     args += [url]
 
     while True:
         LOG.debug("curl fetch command: %s" % ' '.join(args))
-        with chdir(_config('dest')):
-            res = subprocess.call(args)
+        res = subprocess.call(args)
         LOG.debug('curl exit code: %i' % res)
 
         if res == CURL_RANGE_ERROR:
             # Tried to resume, but the server does not support ranges
             # (resuming). Overwrite file.
             LOG.error("resume failed; starting over")
-            args.remove("-C")
+            args.remove("--continue-at")
             args.remove("-")
             continue
         elif res == CURL_HTTP_ERROR:
             LOG.error("download failed")
-            return False
+            return None
 
         if res:
-            return False
+            return None
         else:
-            return True
+            break
+
+    # Move the file to the final filename.
+    with open(headerfile) as f:
+        headers = f.read()
+    dest_file = _filename(url, headers)
+    if dest_file:
+        dest_file = os.path.join(_config('dest'), dest_file)
+        os.rename(outfile, dest_file)
+        return dest_file
+    else:
+        return outfile
 
 
 # Main command-line interface.
@@ -399,9 +463,10 @@ def do_run():
                 cur_url = _wait_for_url()
             while cur_url is not None:
                 set_current(cur_url)
-                success = fetch(cur_url)
-                run_hook(cur_url)
-                if success:
+                dest_path = fetch(cur_url)
+                if dest_path:
+                    LOG.info("downloaded to {}".format(dest_path))
+                    run_hook(cur_url, dest_path)
                     record_success(cur_url)
                     remove = True
                 else:

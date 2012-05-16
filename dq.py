@@ -42,8 +42,6 @@ CONFIG_DEFAULTS = {
 CURL_RANGE_ERROR = 33
 CURL_HTTP_ERROR = 22
 CURL_BASE = ["curl", "--location-trusted", "--fail"]
-CMD_PLACEHOLDER_URL = '<URL>'
-CMD_PLACEHOLDER_PATH = '<PATH>'
 PART_EXT = 'part'
 FILENAME_REPLACE = [
     re.compile(r'[\\/]'),
@@ -174,9 +172,8 @@ def run_hook(url, path):
     command = _config('post')
     if not command:
         return
-    command = command.replace(CMD_PLACEHOLDER_URL, url)
-    command = command.replace(CMD_PLACEHOLDER_PATH, path)
-    subprocess.call(command, shell=True)
+    command = os.path.expanduser(command)
+    subprocess.call([command, path, url])
 
 
 # State management.

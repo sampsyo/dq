@@ -63,9 +63,9 @@ The available configuration keys are:
   basic authentication. If a URL in the queue contains a given key, the username
   and password (separated by whitespace) given in the value are used for
   authentication.
-* `post`: A shell command to be executed when a download completes
-  successfully. The string `<URL>` is replaced with the URL in question;
-  `<PATH>` is replaced with the (local) path to the downloaded file.
+* `post`: A program to be executed when a download completes successfully. The
+  program is invoked with two arguments: the path to the newly downloaded file
+  and the URL it was fetched from. The program must be executable.
 * `curlargs`: Additional command-line arguments to be passed to curl.
 * `retries`: The number of times to try downloading a given URL before giving
   up.
@@ -88,9 +88,7 @@ Here's an example configuration file:
     auth:
         example.com: username password
     poll: 10.0
-    post: >
-        osascript -e 'tell app "System Events" to
-        display dialog "Finished download: <URL>"' &
+    post: ~/bin/handledl
 
 Web Interface
 -------------

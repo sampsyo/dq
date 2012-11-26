@@ -53,6 +53,7 @@ FILENAME_REPLACE = [
 
 LOG = logging.getLogger('dq')
 LOG.addHandler(logging.StreamHandler())
+LOG.propagate = False
 
 class UserError(Exception):
     """Raised when the program is misconfigured."""

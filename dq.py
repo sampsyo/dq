@@ -394,10 +394,9 @@ def _authentication(url):
     URL. Returns an empty list if no authentication is necessary.
     """
     # Add authentication to the URL if necessary.
-    host = urlparse.urlparse(url).netloc
-    auth_hosts = _config('auth')
-    for auth_host, auth_parts in auth_hosts.iteritems():
-        if auth_host in host:
+    auth_pats = _config('auth')
+    for auth_pat, auth_parts in auth_pats.iteritems():
+        if auth_pat in url:
             break
     else:
         # No matching authentication entry found.

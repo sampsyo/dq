@@ -59,7 +59,7 @@ The available configuration keys are:
 
 * `dest`: The download destination directory.
 * `queue`: The URL queue text file path.
-* `auth`: A dictionary mapping domain names to usernames and passwords for HTTP
+* `auth`: A dictionary mapping URL fragments to usernames and passwords for HTTP
   basic authentication. If a URL in the queue contains a given key, the username
   and password (separated by whitespace) given in the value are used for
   authentication.

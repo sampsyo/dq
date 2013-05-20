@@ -135,7 +135,8 @@ def _filename(url, headers):
     heads = re.findall(r'^Content-Disposition:\s*(.*?)\r\n',
                        headers, re.I | re.M)
     if heads:
-        filename = rfc6266.parse_headers(heads[-1]).filename_unsafe
+        cdisp = rfc6266.parse_headers(heads[-1], relaxed=True)
+        filename = cdisp.filename_unsafe
 
     # Get filename from URL.
     if not filename:
